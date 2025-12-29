@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import jwt, {Secret} from "jsonwebtoken";
 import "dotenv/config"
+
 export type AuthedRequest = Request & { userId?: string };
 
 const a = process.env.ACCESS_TOKEN_SECRET;

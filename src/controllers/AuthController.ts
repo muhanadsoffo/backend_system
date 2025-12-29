@@ -1,6 +1,8 @@
 import type { Request, Response } from "express";
 import  * as s  from "../services/AuthService.js" ;
 import {clearRefreshCookie, setRefreshCookie} from "../auth/cookies.js";
+import type { AuthedRequest } from "../middleware/auth.js";
+
 
 
 
@@ -27,4 +29,10 @@ export async function logout(req: Request, res: Response) {
     const r = await s.logout(req.cookies?.refresh);
     clearRefreshCookie(res)
     res.json(r);
+}
+
+export async function profile(req: AuthedRequest, res: Response) {
+    const r = await s.profile(req.userId);
+    res.json(r)
+
 }

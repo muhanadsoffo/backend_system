@@ -3,21 +3,20 @@ import bcrypt from "bcrypt";
 import {makeAccessToken, makeRefreshToken, sha256, verifyRefreshToken} from "../auth/tokens.js";
 import {RefreshToken} from "../models/RefreshToken.js";
 import mongoose from "mongoose";
+import {AppError} from "../errors/AppError.js";
+import z from "zod";
+import {loginSchema, registerSchema} from "../validators/authValidators.js";
 
-function bad(status: number, message: string): never {
-    const e: any = new Error(message);
-    e.status = status;
-    throw e;
-}
 
-export async function register(body: any,) {
-    const email = String(body?.email ?? "").trim().toLowerCase();
-    const password = String(body?.password ?? "");
-    if (!email || !password) bad(400, "email and password are required");
-    if (password.length < 8) bad(400, "password must be at least 8 characters");
+type RegisterInput = z.infer<typeof registerSchema>;
+type LoginInput = z.infer<typeof loginSchema>;
+
+export async function register(body: RegisterInput) {
+    const { email, password } = body;
+
 
     const exists = await User.findOne({ email});
-    if (exists) bad(409, "email already exists");
+    if (exists) throw new AppError(409, "email already exists");
 
     const passwordHash = await bcrypt.hash(password, 12);
     const u = await User.create({email, passwordHash});
@@ -31,7 +30,7 @@ export async function register(body: any,) {
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
     });
 
-    await u.save();
+
     return {
         user: { id: u._id, email: u.email },
         accessToken,
@@ -40,16 +39,16 @@ export async function register(body: any,) {
 
 }
 
-export async function login(body: any, ) {
-    const email = String(body?.email ?? "" ).trim().toLowerCase();
-    const password = String(body?.password ?? "");
-    if (!email || !password) bad(400, "email and password are required");
+export async function login(body: LoginInput ) {
+    const { email, password } = body;
+
     const u = await User.findOne({ email});
 
-    if (!u) bad(409, "Invalid email or password");
+    if (!u) throw new AppError(401,"Invalid email or password")
+
 
     const ok = await bcrypt.compare(password, u.passwordHash);
-    if(!ok) bad(401, "Invalid email or password");
+    if(!ok) throw new AppError(401,"Invalid email or password")
 
     const accessToken = makeAccessToken(u._id.toString());
     const { token: refreshToken } = makeRefreshToken(u._id.toString());
@@ -78,21 +77,22 @@ export async function logout(cookieToken: string | undefined) {
     return {ok : true};
 }
 export async function refresh(cookieToken: string | undefined) {
-    if (!cookieToken) bad(401, "missing refresh token");
+    if (!cookieToken) throw new AppError(401,"missing refresh token")
+
 
     let payload: { userId: string; jti: string; exp: number };
 
     try {
         payload = verifyRefreshToken(cookieToken);
     } catch {
-        bad(401, "invalid refresh token");
+        throw new AppError(401, "invalid refresh token");
     }
 
     const tokenHash = sha256(cookieToken);
 
     const rt = await RefreshToken.findOne({ tokenHash, revokedAt: null });
-    if (!rt) bad(401, "refresh token revoked");
-    if (rt.expiresAt.getTime() < Date.now()) bad(401, "refresh token expired");
+    if (!rt) throw new AppError(401, "refresh token revoked");
+    if (rt.expiresAt.getTime() < Date.now()) throw new AppError(401, "refresh token expired");
 
     rt.revokedAt = new Date();
     await rt.save();
@@ -107,4 +107,13 @@ export async function refresh(cookieToken: string | undefined) {
     });
 
     return { accessToken, newRefreshToken };
+}
+
+export async function profile(userId?: string) {
+    if (!userId) throw new AppError(401, "not authenticated");
+
+    const u = await User.findById(userId).select("_id email createdAt");
+    if (!u) throw new AppError(404, "user not found");
+
+    return u;
 }
