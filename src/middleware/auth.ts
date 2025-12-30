@@ -1,8 +1,12 @@
 import type { Request, Response, NextFunction } from "express";
 import jwt, {Secret} from "jsonwebtoken";
 import "dotenv/config"
+import {Role} from "../constants/roles.js";
 
-export type AuthedRequest = Request & { userId?: string };
+export type AuthedRequest = Request & {
+    userId?: string;
+    role?: Role;
+};
 
 const a = process.env.ACCESS_TOKEN_SECRET;
 if (!a) throw new Error("Missing ACCESS_TOKEN_SECRET");
@@ -17,6 +21,7 @@ export function requireAuth(req: AuthedRequest, res: Response, next: NextFunctio
     try {
         const p = jwt.verify(token, accessSecret) as any;
         req.userId = String(p.userId);
+        req.role = p.role;
         next();
     } catch {
         return res.status(401).json({ message: "Invalid access token" });

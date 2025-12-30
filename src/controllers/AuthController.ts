@@ -36,3 +36,6 @@ export async function profile(req: AuthedRequest, res: Response) {
     res.json(r)
 
 }
+export async function adminSecret(req: any, res: any) {
+    res.json({ ok: true, message: "welcome admin" });
+}

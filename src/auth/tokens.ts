@@ -12,9 +12,9 @@ if (!r) throw new Error('No refresh token provided');
 const accessSecret: Secret = a;
 const refreshSecret: Secret = r;
 
-export function makeAccessToken(userId: string) {
+export function makeAccessToken(userId: string, role: string) {
     const exp: SignOptions["expiresIn"] = (process.env.ACCESS_TOKEN_EXPIRES_IN ?? "15m") as any;
-    return jwt.sign({userId}, accessSecret, {expiresIn: exp})
+    return jwt.sign({userId, role}, accessSecret, {expiresIn: exp})
 }
 
 export function makeRefreshToken(userId: string) {

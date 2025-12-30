@@ -21,7 +21,7 @@ export async function register(body: RegisterInput) {
     const passwordHash = await bcrypt.hash(password, 12);
     const u = await User.create({email, passwordHash});
 
-    const accessToken = makeAccessToken(u._id.toString());
+    const accessToken = makeAccessToken(u._id.toString(),u.role);
     const {token: refreshToken} = makeRefreshToken(u._id.toString());
 
     await RefreshToken.create({
@@ -50,7 +50,7 @@ export async function login(body: LoginInput ) {
     const ok = await bcrypt.compare(password, u.passwordHash);
     if(!ok) throw new AppError(401,"Invalid email or password")
 
-    const accessToken = makeAccessToken(u._id.toString());
+    const accessToken = makeAccessToken(u._id.toString(),u.role);
     const { token: refreshToken } = makeRefreshToken(u._id.toString());
 
     await RefreshToken.create({
@@ -94,10 +94,13 @@ export async function refresh(cookieToken: string | undefined) {
     if (!rt) throw new AppError(401, "refresh token revoked");
     if (rt.expiresAt.getTime() < Date.now()) throw new AppError(401, "refresh token expired");
 
+    const u = await User.findById(payload.userId).select("_id role");
+    if (!u) throw new AppError(401, "user not found");
+
     rt.revokedAt = new Date();
     await rt.save();
 
-    const accessToken = makeAccessToken(payload.userId);
+    const accessToken = makeAccessToken(payload.userId,u.role);
     const { token: newRefreshToken } = makeRefreshToken(payload.userId);
 
     await RefreshToken.create({
